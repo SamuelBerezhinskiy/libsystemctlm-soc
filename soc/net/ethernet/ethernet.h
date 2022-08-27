@@ -1,8 +1,8 @@
 /*
- * Bit operation functions.
+ * Common Ethernet functions.
  *
- * Copyright (c) 2019 Xilinx Inc.
- * Written by Edgar E. Iglesias
+ * Copyright (c) 2022 Advanced Micro Devices Inc.
+ * Written by Edgar E. Iglesias.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,56 +22,41 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+#ifndef SOC_NET_ETHERNET_ETHERNET_H__
+#define SOC_NET_ETHERNET_ETHERNET_H__
 
-#ifndef BITOPS_H__
-#define BITOPS_H__
+#include <string.h>
+#include <inttypes.h>
 
-static inline uint32_t bitops_mask32(unsigned int bitlen)
-{
-	assert(bitlen <= 32);
+#define ETH_ADDR_LEN	6
 
-	if (bitlen == 32)
-		return ~0;
+/* Type/Protocols. */
+#define ETH_HDR_TYPE_IP		0x0800
+#define ETH_HDR_TYPE_VLAN	0x8100
+#define ETH_HDR_TYPE_PAUSE	0x8808
+#define ETH_HDR_TYPE_UNKOWN	0xFFFF
 
-	return (1ULL << bitlen) - 1;
+static inline bool eth_is_multicast(const unsigned char *daddr) {
+	return daddr[0] & 1;
 }
 
-static inline uint32_t bitops_field32(uint32_t val,
-				      unsigned int bit, unsigned int len)
-{
-	uint32_t r;
-
-	assert(bit < 32);
-	assert(len <= 32);
-
-	r = val >> bit;
-	return r & bitops_mask32(len);
+static inline bool eth_is_unicast(const unsigned char *daddr) {
+	return !eth_is_multicast(daddr);
 }
 
-static inline uint64_t bitops_mask64(unsigned int start, unsigned int len)
-{
-	uint64_t v;
+static inline bool eth_is_broadcast(const unsigned char *daddr) {
+	unsigned char bcast[ETH_ADDR_LEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
-	if (start >= 64 || len == 0)
-		return 0;
-
-	v = ~(uint64_t)0;
-	if (len < 64)
-		v >>= 64 - len;
-	v <<= start;
-	return v;
+	return memcmp(daddr, bcast, ETH_ADDR_LEN) == 0;
 }
 
-// Maps an sc_bv into a vector of booleans.
-template <int width>
-static void map_sc_bv2v(sc_vector<sc_signal<bool> > &v, const sc_bv<width> &s)
-{
-	int i;
+static inline uint16_t eth_get_type(const unsigned char *pkt) {
+	uint16_t type;
+	int offset = ETH_ADDR_LEN * 2;
 
-	for (i = 0; i < width && i < v.size(); i++) {
-		bool b = s[i].to_bool();
+	type = pkt[offset] << 8;
+	type |= pkt[offset + 1];
 
-		v[i].write(b);
-	}
+	return type;
 }
 #endif
